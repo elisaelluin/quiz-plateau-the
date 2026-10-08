@@ -1,0 +1,664 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Le Grand Quiz du Thé</title>
+<style>
+  :root {
+    --bg: #F5EFE3;
+    --card: #FFFDF8;
+    --ink: #1E2B24;
+    --board: #1B2A24;
+    --muted: #5E6A62;
+    --line: #E2D9C6;
+    --ok: #2E7D4F;
+    --ok-bg: #EAF5EE;
+    --ko: #B3402E;
+    --ko-bg: #FBECE8;
+    --serif: "Iowan Old Style", "Palatino Linotype", Palatino, Georgia, "Times New Roman", serif;
+    --sans: "Segoe UI", system-ui, -apple-system, Roboto, "Helvetica Neue", Arial, sans-serif;
+    --c: #2F7A55;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; }
+  body {
+    font-family: var(--sans);
+    background: var(--bg);
+    color: var(--ink);
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+  .app { max-width: 960px; margin: 0 auto; padding: 20px 16px 28px; }
+
+  /* En-tête */
+  .top { padding-bottom: 14px; margin-bottom: 20px; border-bottom: 1px solid var(--line); }
+  .eyebrow {
+    margin: 0 0 2px; font-size: 12px; font-weight: 600; letter-spacing: .14em;
+    text-transform: uppercase; color: var(--muted);
+  }
+  h1 { font-family: var(--serif); font-weight: 600; font-size: clamp(22px, 3.4vw, 30px); margin: 0; letter-spacing: -.01em; }
+
+  /* Mise en page */
+  .layout { display: grid; grid-template-columns: minmax(260px, 360px) 1fr; gap: 28px; align-items: start; }
+
+  /* Plateau */
+  .plateau {
+    background: var(--board); border-radius: 26px; padding: 14px;
+    box-shadow: 0 1px 0 #fff inset, 0 10px 24px rgba(30, 43, 36, .18);
+    border: 5px solid #2C3F36;
+  }
+  .wheel { width: 100%; display: block; overflow: visible; }
+  .case { fill: var(--c); stroke: rgba(255, 255, 255, .28); stroke-width: .8; }
+  .case.start { fill: #F5EFE3; stroke: none; }
+  .num { font: 700 9px var(--sans); fill: #fff; text-anchor: middle; dominant-baseline: central; }
+  .tick { fill: none; stroke: #fff; stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; opacity: 0; }
+  .done .num { opacity: 0; }
+  .done .tick { opacity: 1; }
+  .flag { fill: var(--board); }
+  .spoke { stroke: #F5EFE3; stroke-width: 1.6; stroke-linecap: round; opacity: .22; }
+  .hub { fill: #F5EFE3; }
+  .count { font: 600 21px var(--serif); fill: var(--ink); text-anchor: middle; }
+  .count-label { font: 600 7px var(--sans); letter-spacing: .14em; text-transform: uppercase; fill: var(--muted); text-anchor: middle; }
+  .cursor { fill: none; stroke: #fff; stroke-width: 3; stroke-linejoin: round; animation: pulse 1.1s ease-in-out infinite; }
+  .cursor[hidden] { display: none; }
+  @keyframes pulse { 0%, 100% { stroke-opacity: 1; } 50% { stroke-opacity: .25; } }
+  .pawn-shadow { fill: rgba(0, 0, 0, .35); }
+  .pawn-body { stroke: #1B2A24; stroke-width: 1.5; stroke-linejoin: round; }
+
+  .legend {
+    list-style: none; margin: 16px 0 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr;
+    gap: 6px 10px; text-align: left; font-size: 13px;
+  }
+  .legend li { display: flex; align-items: center; gap: 7px; color: var(--muted); }
+  .legend .dot { width: 10px; height: 10px; border-radius: 3px; background: var(--c); flex: none; }
+  .legend li.current { color: var(--ink); font-weight: 700; }
+
+  /* Panneau de jeu */
+  .panel {
+    background: var(--card); border: 1px solid var(--line); border-radius: 16px;
+    padding: 22px 22px 24px; min-height: 400px;
+  }
+  .kicker { font-size: 13px; color: var(--muted); margin: 0 0 10px; font-weight: 600; }
+  .chip {
+    display: inline-block; font-size: 12px; font-weight: 700; letter-spacing: .08em;
+    text-transform: uppercase; color: #fff; background: var(--c); padding: 5px 12px; border-radius: 999px;
+  }
+  h2 { font-family: var(--serif); font-size: clamp(19px, 2.6vw, 24px); line-height: 1.25; margin: 12px 0 16px; font-weight: 600; }
+  h2:focus { outline: none; }
+  .lead { margin: 0 0 14px; color: var(--muted); }
+  .rules { margin: 0; padding-left: 20px; }
+  .rules li { margin-bottom: 8px; }
+
+  .options { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+  .opt {
+    width: 100%; display: flex; align-items: center; gap: 12px; text-align: left;
+    font: inherit; font-size: 15.5px; color: var(--ink); background: #fff;
+    border: 1.5px solid var(--line); border-radius: 12px; padding: 12px 14px; cursor: pointer;
+    transition: border-color .15s, background .15s;
+  }
+  .opt:hover:not(:disabled) { border-color: var(--c); }
+  .opt .letter {
+    flex: none; width: 28px; height: 28px; border-radius: 50%; display: grid; place-items: center;
+    font-size: 13px; font-weight: 700; background: var(--bg); color: var(--ink);
+  }
+  .opt:disabled { cursor: default; opacity: .55; }
+  .opt.is-correct { opacity: 1; border-color: var(--ok); background: var(--ok-bg); }
+  .opt.is-correct .letter { background: var(--ok); color: #fff; }
+  .opt.is-wrong { opacity: 1; border-color: var(--ko); background: var(--ko-bg); }
+  .opt.is-wrong .letter { background: var(--ko); color: #fff; }
+
+  .feedback { margin-top: 16px; padding: 14px 16px; border-radius: 12px; border-left: 4px solid var(--ok); background: var(--ok-bg); }
+  .feedback.ko { border-left-color: var(--ko); background: var(--ko-bg); }
+  .feedback strong { display: block; margin-bottom: 2px; }
+  .feedback p { margin: 0; font-size: 14.5px; }
+
+  .btn {
+    font: inherit; font-weight: 700; font-size: 15px; border: 0; border-radius: 999px;
+    padding: 12px 22px; background: var(--ink); color: var(--card); cursor: pointer; margin-top: 18px;
+  }
+  .btn:hover { background: #2C4034; }
+  :focus-visible { outline: 3px solid #2B6C8A; outline-offset: 2px; }
+
+  /* Écran de fin */
+  .stats { display: flex; gap: 12px; flex-wrap: wrap; margin: 14px 0; }
+  .stat { flex: 1 1 130px; border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; font-size: 13.5px; color: var(--muted); }
+  .stat b { font-family: var(--serif); font-size: 26px; display: block; color: var(--ink); font-weight: 600; }
+  .code { margin-top: 6px; padding: 14px 16px; border: 1.5px dashed var(--ink); border-radius: 12px; font-size: 14.5px; }
+  .code b { display: block; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; letter-spacing: .18em; font-size: 20px; margin: 4px 0; }
+
+  @media (max-width: 700px) {
+    .layout { grid-template-columns: 1fr; gap: 18px; }
+    .plateau { max-width: 270px; margin: 0 auto; padding: 10px; border-radius: 22px; }
+    .legend { grid-template-columns: 1fr 1fr 1fr; font-size: 12px; }
+    .panel { padding: 18px 16px 20px; min-height: 0; }
+  }
+  @media (max-width: 420px) { .legend { grid-template-columns: 1fr 1fr; } }
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+</head>
+<body>
+<main class="app">
+  <header class="top">
+    <p class="eyebrow" id="sousTitre"></p>
+    <h1 id="titre"></h1>
+  </header>
+
+  <div class="layout">
+    <div class="board">
+      <div class="plateau">
+        <svg class="wheel" id="wheel" viewBox="0 0 200 200" role="img"></svg>
+      </div>
+      <ul class="legend" id="legend"></ul>
+    </div>
+    <section class="panel" id="panel" aria-live="polite"></section>
+  </div>
+</main>
+
+<script>
+/* =====================================================================
+   CONFIGURATION : tout ce qui se personnalise est ici.
+   - titre / sousTitre : textes de l'en-tête
+   - nombreDeCases     : nombre de cases à parcourir sur le plateau
+                         (entre 4 et 16). Les cases reprennent les
+                         catégories dans l'ordre, en boucle.
+   - couleurPion       : couleur du pion
+   - codeFinal         : mot affiché à la fin (à saisir dans l'activité
+                         suivante du cours). Laisser "" pour le masquer.
+   - categories        : de 2 à 8 catégories. Pour chaque question,
+                         "bonne" est la position de la bonne réponse
+                         dans "choix" (0 = première, 1 = deuxième...).
+                         Prévoir au moins 3 questions par catégorie.
+   ===================================================================== */
+const CONFIG = {
+  titre: "Le Grand Quiz du Thé",
+  sousTitre: "École du Thé",
+  nombreDeCases: 12,
+  couleurPion: "#F2C14E",
+  codeFinal: "CAMELLIA",
+  categories: [
+    {
+      nom: "Origines",
+      couleur: "#2F7A55",
+      questions: [
+        {
+          q: "Dans quel pays se trouve la région de Darjeeling ?",
+          choix: ["Inde", "Chine", "Sri Lanka", "Japon"],
+          bonne: 0,
+          explication: "Darjeeling se situe au nord-est de l'Inde, sur les contreforts de l'Himalaya."
+        },
+        {
+          q: "Dans quel pays se trouve la région d'Uji, réputée pour ses thés verts ?",
+          choix: ["Chine", "Corée du Sud", "Japon", "Vietnam"],
+          bonne: 2,
+          explication: "Uji, près de Kyoto, est l'un des terroirs historiques du thé vert japonais."
+        },
+        {
+          q: "Les thés de Ceylan proviennent de quelle île ?",
+          choix: ["Taïwan", "Sri Lanka", "Java", "Madagascar"],
+          bonne: 1,
+          explication: "Ceylan est l'ancien nom du Sri Lanka, encore utilisé pour désigner ses thés."
+        }
+      ]
+    },
+    {
+      nom: "Familles de thé",
+      couleur: "#B5562B",
+      questions: [
+        {
+          q: "Thé vert, noir, blanc ou oolong : de quelle plante proviennent-ils ?",
+          choix: ["De quatre plantes différentes", "Du Camellia sinensis, le théier", "De la verveine", "De la menthe poivrée"],
+          bonne: 1,
+          explication: "Toutes les familles de thé sont issues du même arbuste, le Camellia sinensis."
+        },
+        {
+          q: "Qu'est-ce qui distingue avant tout un thé noir d'un thé vert ?",
+          choix: ["La taille des feuilles", "Le pays de récolte", "Le degré d'oxydation des feuilles", "L'ajout d'arômes"],
+          bonne: 2,
+          explication: "Un thé noir est totalement oxydé, alors qu'un thé vert ne l'est pas."
+        },
+        {
+          q: "Comment qualifie-t-on un oolong ?",
+          choix: ["Un thé non oxydé", "Un thé semi-oxydé", "Un thé fumé", "Une infusion sans théine"],
+          bonne: 1,
+          explication: "Le oolong est partiellement oxydé, à mi-chemin entre thé vert et thé noir."
+        }
+      ]
+    },
+    {
+      nom: "Préparation",
+      couleur: "#2B6C8A",
+      questions: [
+        {
+          q: "À quelle température infuse-t-on en général un thé vert japonais ?",
+          choix: ["Entre 60 et 80 °C", "Entre 90 et 95 °C", "À 100 °C, à ébullition", "À l'eau froide uniquement"],
+          bonne: 0,
+          explication: "Une eau trop chaude brûle les feuilles et fait ressortir l'amertume."
+        },
+        {
+          q: "Que risque-t-on en laissant infuser un thé vert trop longtemps ?",
+          choix: ["Un thé sans goût", "Un thé plus sucré", "Un thé amer et astringent", "Un thé sans théine"],
+          bonne: 2,
+          explication: "Une infusion prolongée libère davantage de tanins, d'où l'amertume."
+        },
+        {
+          q: "Pourquoi préchauffer la théière avant l'infusion ?",
+          choix: ["Pour la nettoyer", "Pour éviter que l'eau ne refroidisse trop vite", "Pour colorer le thé", "Pour retirer la théine"],
+          bonne: 1,
+          explication: "Une théière froide fait chuter la température de l'eau dès le versement."
+        }
+      ]
+    },
+    {
+      nom: "Dégustation",
+      couleur: "#8A3B5C",
+      questions: [
+        {
+          q: "Que désigne l'astringence en dégustation ?",
+          choix: ["Une note sucrée", "Une sensation d'assèchement en bouche", "Un arôme fumé", "La couleur de la tasse"],
+          bonne: 1,
+          explication: "L'astringence est cette sensation de sécheresse provoquée par les tanins."
+        },
+        {
+          q: "Quelle saveur caractérise les grands thés verts japonais ombrés comme le Gyokuro ?",
+          choix: ["L'umami", "L'acidité", "Le piquant", "Le salé"],
+          bonne: 0,
+          explication: "L'ombrage avant récolte renforce l'umami, cette saveur ronde et savoureuse."
+        },
+        {
+          q: "En dégustation, comment appelle-t-on le liquide obtenu après infusion ?",
+          choix: ["Le jus", "Le bouillon", "La liqueur", "Le nectar"],
+          bonne: 2,
+          explication: "On parle de liqueur pour le liquide et d'infusion pour les feuilles infusées."
+        }
+      ]
+    },
+    {
+      nom: "Histoire et culture",
+      couleur: "#9C6B14",
+      questions: [
+        {
+          q: "Selon la légende, quel empereur chinois aurait découvert le thé ?",
+          choix: ["Qin Shi Huang", "Shennong", "Kubilai Khan", "Puyi"],
+          bonne: 1,
+          explication: "La légende raconte que des feuilles seraient tombées dans l'eau chaude de Shennong."
+        },
+        {
+          q: "Comment s'appelle la cérémonie du thé japonaise ?",
+          choix: ["Le Chanoyu", "Le Gong Fu Cha", "L'Ikebana", "Le Kintsugi"],
+          bonne: 0,
+          explication: "Le Chanoyu est l'art japonais de préparer et de servir le matcha."
+        },
+        {
+          q: "De quel pays vient la méthode de préparation Gong Fu Cha ?",
+          choix: ["Japon", "Inde", "Chine", "Népal"],
+          bonne: 2,
+          explication: "Le Gong Fu Cha est une méthode chinoise d'infusions courtes et successives."
+        }
+      ]
+    },
+    {
+      nom: "Conseil client",
+      couleur: "#5B5EA6",
+      questions: [
+        {
+          q: "Un client cherche une boisson sans théine pour le soir. Que lui proposer ?",
+          choix: ["Un thé noir corsé", "Un matcha", "Un rooibos ou une infusion", "Un thé vert du matin"],
+          bonne: 2,
+          explication: "Le rooibos et les infusions de plantes sont naturellement sans théine."
+        },
+        {
+          q: "Quel conseil de conservation donner à un client ?",
+          choix: ["Au réfrigérateur, sachet ouvert", "À l'abri de l'air, de la lumière, de l'humidité et des odeurs", "Près de la plaque de cuisson", "Dans un bocal en verre au soleil"],
+          bonne: 1,
+          explication: "Le thé craint l'air, la lumière, l'humidité et les odeurs fortes."
+        },
+        {
+          q: "Un client trouve son thé vert trop amer à la maison. Quel premier conseil ?",
+          choix: ["Baisser la température de l'eau et réduire le temps d'infusion", "Doubler la dose de thé", "Infuser plus longtemps", "Utiliser de l'eau bouillante"],
+          bonne: 0,
+          explication: "L'amertume vient le plus souvent d'une eau trop chaude ou d'une infusion trop longue."
+        }
+      ]
+    }
+  ]
+};
+
+/* =====================================================================
+   MOTEUR DU JEU : rien à modifier en dessous pour changer le contenu.
+   ===================================================================== */
+(function () {
+  "use strict";
+
+  var cats = CONFIG.categories;
+  var N = cats.length;
+  var M = Math.max(4, Math.min(16, CONFIG.nombreDeCases || 12));  // cases à parcourir
+  var T = M + 1;                                                   // + la case Départ / Arrivée
+  var STEP = 360 / T;
+  var R_OUT = 97, R_IN = 63, R_MID = 80, R_HUB = 39;
+  var SVGNS = "http://www.w3.org/2000/svg";
+  var reduceMotion = window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+  var panel = document.getElementById("panel");
+  var wheel = document.getElementById("wheel");
+  var legend = document.getElementById("legend");
+
+  var state, caseGroups = [], countText, countLabel, cursor, pawn, pawnAt = 0;
+
+  function reset() {
+    state = {
+      pos: 0,           // case sur laquelle se trouve le pion (0 = Départ)
+      target: null,     // case visée par la question en cours
+      asked: 0,         // nombre total de questions posées
+      firstTry: 0,      // cases réussies du premier coup
+      tries: 0,         // essais sur la case en cours
+      finished: false,
+      used: cats.map(function () { return []; }),
+      last: cats.map(function () { return -1; })
+    };
+  }
+  function catOf(k) { return (k - 1) % N; }   // catégorie de la case k (1..M)
+
+  /* ---------- Petits outils ---------- */
+  function el(tag, cls, text) {
+    var n = document.createElement(tag);
+    if (cls) n.className = cls;
+    if (text !== undefined) n.textContent = text;
+    return n;
+  }
+  function svg(tag, attrs, text) {
+    var n = document.createElementNS(SVGNS, tag);
+    for (var k in attrs) n.setAttribute(k, attrs[k]);
+    if (text !== undefined) n.textContent = text;
+    return n;
+  }
+  function fr(t) { return String(t).replace(/ ([?!:;])/g, "\u00a0$1"); }   // pas de retour à la ligne avant ? ! : ;
+  function rand(n) { return Math.floor(Math.random() * n); }
+  function shuffle(a) {
+    a = a.slice();
+    for (var i = a.length - 1; i > 0; i--) {
+      var j = rand(i + 1), t = a[i]; a[i] = a[j]; a[j] = t;
+    }
+    return a;
+  }
+  function setPanel(nodes, focusNode) {
+    panel.innerHTML = "";
+    nodes.forEach(function (n) { if (n) panel.appendChild(n); });
+    if (focusNode) {
+      focusNode.setAttribute("tabindex", "-1");
+      try { focusNode.focus({ preventScroll: true }); } catch (e) { /* sans gravité */ }
+    }
+  }
+  function button(label, onClick) {
+    var b = el("button", "btn", label);
+    b.type = "button";
+    b.addEventListener("click", onClick);
+    return b;
+  }
+
+  /* ---------- Plateau ---------- */
+  function angleOf(i) { return -90 + i * STEP; }             // centre de la case i
+  function point(r, deg) {
+    var rad = deg * Math.PI / 180;
+    return { x: 100 + r * Math.cos(rad), y: 100 + r * Math.sin(rad) };
+  }
+  function pt(r, deg) { var p = point(r, deg); return p.x.toFixed(2) + " " + p.y.toFixed(2); }
+  function casePath(i, grow) {
+    var gap = 1.8, g = grow || 0;
+    var a0 = angleOf(i) - STEP / 2 + gap / 2, a1 = angleOf(i) + STEP / 2 - gap / 2;
+    var ro = R_OUT + g, ri = R_IN - g;
+    return "M " + pt(ro, a0) + " A " + ro + " " + ro + " 0 0 1 " + pt(ro, a1) +
+           " L " + pt(ri, a1) + " A " + ri + " " + ri + " 0 0 0 " + pt(ri, a0) + " Z";
+  }
+
+  function buildBoard() {
+    wheel.innerHTML = ""; legend.innerHTML = ""; caseGroups = [];
+
+    // rayons décoratifs entre le centre et la piste
+    for (var sp = 0; sp < 6; sp++) {
+      var a = -90 + sp * 60, p0 = point(R_HUB + 4, a), p1 = point(R_IN - 4, a);
+      wheel.appendChild(svg("line", { x1: p0.x, y1: p0.y, x2: p1.x, y2: p1.y, "class": "spoke" }));
+    }
+
+    // cases
+    for (var i = 0; i < T; i++) {
+      var g = svg("g", {}), c = point(R_MID, angleOf(i));
+      if (i === 0) {
+        g.appendChild(svg("path", { d: casePath(0), "class": "case start" }));
+        // petit drapeau de départ / arrivée
+        g.appendChild(svg("path", {
+          "class": "flag",
+          d: "M " + (c.x - 5) + " " + (c.y - 8) + " h 1.6 v 16 h -1.6 Z M " + (c.x - 3.4) + " " + (c.y - 7.5) +
+             " l 9 3.6 l -9 3.6 Z"
+        }));
+      } else {
+        var p = svg("path", { d: casePath(i), "class": "case" });
+        p.style.setProperty("--c", cats[catOf(i)].couleur);
+        g.appendChild(p);
+        g.appendChild(svg("text", { x: c.x, y: c.y, "class": "num" }, String(i)));
+        g.appendChild(svg("polyline", {
+          "class": "tick",
+          points: (c.x - 5) + "," + c.y + " " + (c.x - 1.5) + "," + (c.y + 3.5) + " " + (c.x + 5) + "," + (c.y - 3.5)
+        }));
+      }
+      wheel.appendChild(g); caseGroups.push(g);
+    }
+
+    // centre du plateau
+    wheel.appendChild(svg("circle", { cx: 100, cy: 100, r: R_HUB, "class": "hub" }));
+    countText = svg("text", { x: 100, y: 105, "class": "count" });
+    wheel.appendChild(countText);
+    countLabel = svg("text", { x: 100, y: 117, "class": "count-label" }, "cases");
+    wheel.appendChild(countLabel);
+
+    // contour de la case visée
+    cursor = svg("path", { "class": "cursor", hidden: "" });
+    wheel.appendChild(cursor);
+
+    // pion
+    pawn = svg("g", { "class": "pawn" });
+    pawn.appendChild(svg("ellipse", { cx: 0, cy: 8, rx: 7, ry: 2.4, "class": "pawn-shadow" }));
+    var body = svg("path", { "class": "pawn-body", d: "M -6.5 7.5 Q -6 0 -2.4 -2.5 L 2.4 -2.5 Q 6 0 6.5 7.5 Z" });
+    var head = svg("circle", { "class": "pawn-body", cx: 0, cy: -6, r: 4.6 });
+    body.setAttribute("fill", CONFIG.couleurPion || "#F2C14E");
+    head.setAttribute("fill", CONFIG.couleurPion || "#F2C14E");
+    pawn.appendChild(body); pawn.appendChild(head);
+    wheel.appendChild(pawn);
+
+    // légende
+    cats.forEach(function (cat) {
+      var li = el("li");
+      li.style.setProperty("--c", cat.couleur);
+      li.appendChild(el("span", "dot"));
+      li.appendChild(el("span", "", cat.nom));
+      legend.appendChild(li);
+    });
+  }
+
+  function placePawn(a, lift) {
+    var p = point(R_MID, angleOf(a));
+    pawn.setAttribute("transform",
+      "translate(" + p.x.toFixed(2) + " " + (p.y - (lift || 0)).toFixed(2) + ")" +
+      (lift ? " scale(" + (1 + lift / 40).toFixed(3) + ")" : ""));
+    pawnAt = a;
+  }
+  function movePawn(to, done) {
+    var from = pawnAt, t0 = null, D = 620;
+    if (reduceMotion || !window.requestAnimationFrame) { placePawn(to); if (done) done(); return; }
+    function frame(ts) {
+      if (t0 === null) t0 = ts;
+      var t = Math.min(1, (ts - t0) / D);
+      var e = t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;   // accélère puis ralentit
+      placePawn(from + (to - from) * e, 9 * Math.sin(Math.PI * t));
+      if (t < 1) requestAnimationFrame(frame);
+      else { placePawn(to); if (done) done(); }
+    }
+    requestAnimationFrame(frame);
+  }
+
+  function updateBoard() {
+    for (var i = 1; i <= M; i++) caseGroups[i].classList.toggle("done", i <= state.pos);
+    if (state.target) { cursor.setAttribute("d", casePath(state.target, 1.6)); cursor.removeAttribute("hidden"); }
+    else cursor.setAttribute("hidden", "");
+
+    var currentCat = state.target ? catOf(state.target) : -1;
+    for (var c = 0; c < N; c++) legend.children[c].classList.toggle("current", c === currentCat);
+
+    if (state.finished) { countText.textContent = "Bravo"; countLabel.textContent = "arrivée"; }
+    else { countText.textContent = state.pos + "/" + M; countLabel.textContent = "cases"; }
+    wheel.setAttribute("aria-label", state.finished
+      ? "Plateau de jeu : le pion a franchi la ligne d'arrivée"
+      : "Plateau de jeu : le pion est sur la case " + state.pos + " sur " + M);
+  }
+
+  /* ---------- Écrans ---------- */
+  function renderIntro() {
+    var rules = el("ol", "rules");
+    [
+      "Votre pion part de la case Départ.",
+      "Chaque case porte la couleur d'une catégorie. Une bonne réponse fait avancer le pion sur la case suivante.",
+      "En cas d'erreur, le pion reste en place et une nouvelle question vous est posée.",
+      "Faites le tour complet du plateau pour franchir la ligne d'arrivée."
+    ].forEach(function (t) { rules.appendChild(el("li", "", t)); });
+    setPanel([
+      el("p", "kicker", M + " cases, " + N + " catégories"),
+      el("h2", "", "Faites le tour du plateau"),
+      rules,
+      button("Lancer la partie", nextCase)
+    ]);
+  }
+
+  function nextCase() {
+    state.target = state.pos + 1;
+    state.tries = 0;
+    updateBoard();
+    renderQuestion();
+  }
+
+  function pickQuestion(ci) {
+    var total = cats[ci].questions.length, pool = [];
+    if (state.used[ci].length >= total) state.used[ci] = [];
+    for (var i = 0; i < total; i++) {
+      if (state.used[ci].indexOf(i) === -1 && (total === 1 || i !== state.last[ci])) pool.push(i);
+    }
+    if (!pool.length) { state.used[ci] = []; for (i = 0; i < total; i++) if (i !== state.last[ci]) pool.push(i); }
+    var qi = pool[rand(pool.length)];
+    state.used[ci].push(qi); state.last[ci] = qi;
+    return cats[ci].questions[qi];
+  }
+
+  function renderQuestion() {
+    var k = state.target, ci = catOf(k), cat = cats[ci], q = pickQuestion(ci);
+    panel.style.setProperty("--c", cat.couleur);
+
+    var h = el("h2", "", fr(q.q));
+    var list = el("ul", "options");
+    var slot = el("div");
+    var buttons = [];
+
+    shuffle(q.choix.map(function (t, i) { return i; })).forEach(function (idx, pos) {
+      var li = el("li");
+      var b = el("button", "opt");
+      b.type = "button";
+      b.appendChild(el("span", "letter", "ABCDEF".charAt(pos)));
+      b.appendChild(el("span", "", fr(q.choix[idx])));
+      b.addEventListener("click", function () { answer(idx, b); });
+      buttons.push({ idx: idx, node: b });
+      li.appendChild(b); list.appendChild(li);
+    });
+
+    function answer(idx, node) {
+      state.asked++; state.tries++;
+      var ok = idx === q.bonne;
+      buttons.forEach(function (o) {
+        o.node.disabled = true;
+        if (o.idx === q.bonne) o.node.classList.add("is-correct");
+      });
+      if (!ok) node.classList.add("is-wrong");
+
+      var fb = el("div", "feedback" + (ok ? "" : " ko"));
+      fb.appendChild(el("strong", "", ok ? "Bonne réponse, votre pion avance !" : "Pas tout à fait, votre pion reste en place."));
+      if (q.explication) fb.appendChild(el("p", "", fr(q.explication)));
+      slot.appendChild(fb);
+
+      var next;
+      if (ok) {
+        if (state.tries === 1) state.firstTry++;
+        state.pos = k;
+        state.target = null;
+        updateBoard();
+        movePawn(k);
+        next = state.pos === M
+          ? button("Franchir la ligne d'arrivée", finish)
+          : button("Case suivante", nextCase);
+      } else {
+        next = button("Nouvelle question", renderQuestion);
+      }
+      slot.appendChild(next);
+      try { next.focus({ preventScroll: false }); } catch (e) { /* sans gravité */ }
+    }
+
+    setPanel([
+      el("p", "kicker", "Case " + k + " sur " + M),
+      el("span", "chip", cat.nom),
+      h, list, slot
+    ], h);
+  }
+
+  function finish() {
+    state.finished = true;
+    updateBoard();
+    renderEnd();
+    movePawn(T);   // retour sur la case Départ / Arrivée
+  }
+
+  function renderEnd() {
+    panel.style.setProperty("--c", "#1E2B24");
+
+    var h = el("h2", "", "Bravo, vous avez fait le tour du plateau !");
+    var lead = el("p", "lead", state.firstTry === M
+      ? "Sans faute : toutes les cases réussies du premier coup."
+      : "Votre pion a franchi les " + M + " cases.");
+
+    var stats = el("div", "stats");
+    [
+      [state.firstTry + "/" + M, "cases réussies du premier coup"],
+      [String(state.asked), "questions pour boucler le tour"]
+    ].forEach(function (s) {
+      var d = el("div", "stat");
+      d.appendChild(el("b", "", s[0]));
+      d.appendChild(document.createTextNode(s[1]));
+      stats.appendChild(d);
+    });
+
+    var code = null;
+    if (CONFIG.codeFinal) {
+      code = el("div", "code");
+      code.appendChild(document.createTextNode("Votre mot de passage :"));
+      code.appendChild(el("b", "", CONFIG.codeFinal));
+      code.appendChild(document.createTextNode("Notez-le, il vous sera demandé à l'étape suivante du cours."));
+    }
+
+    setPanel([
+      el("p", "kicker", "Partie terminée"),
+      h, lead, stats, code,
+      button("Rejouer", function () { reset(); placePawn(0); updateBoard(); renderIntro(); })
+    ], h);
+  }
+
+  /* ---------- Démarrage ---------- */
+  document.getElementById("titre").textContent = CONFIG.titre;
+  document.getElementById("sousTitre").textContent = CONFIG.sousTitre;
+  document.title = CONFIG.titre;
+  reset();
+  buildBoard();
+  placePawn(0);
+  updateBoard();
+  renderIntro();
+})();
+</script>
+</body>
+</html>
